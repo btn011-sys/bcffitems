@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>公司內部物資申購平台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+  <!-- 頂部列 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>內部物資申購系統</h2>
+    <div id="userInfo" class="d-none">
+      <span id="userNameDisplay" class="me-2 fw-bold"></span>
+      <button class="btn btn-outline-danger btn-sm" onclick="logout()">登出</button>
+    </div>
+  </div>
+
+  <!-- 1. 登入區塊 -->
+  <div id="loginCard" class="card mx-auto" style="max-width: 400px;">
+    <div class="card-body">
+      <h5 class="card-title mb-3">同仁登入</h5>
+      <input type="email" id="loginEmail" class="form-control mb-2" placeholder="Email">
+      <input type="password" id="loginPassword" class="form-control mb-3" placeholder="密碼">
+      <button class="btn btn-primary w-100" onclick="login()">登入</button>
+    </div>
+  </div>
+
+  <!-- 2. 主要功能區 (登入後顯示) -->
+  <div id="mainContent" class="d-none">
+    <!-- 頁籤導覽 -->
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#shopTab">物資申購</button>
+      </li>
+      <li class="nav-item d-none" id="adminTabBtn">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminTab">後台管理與報表</button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- 申購區 -->
+      <div class="tab-pane fade show active" id="shopTab">
+        <div class="row">
+          <div class="col-md-8">
+            <h4>物資列表</h4>
+            <div id="productList" class="row g-3"></div>
+          </div>
+          <div class="col-md-4">
+            <h4>已選物資</h4>
+            <ul id="cartList" class="list-group mb-3"></ul>
+            <button class="btn btn-success w-100" onclick="submitOrder()">確認送出申請</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 後台管理區 -->
+      <div class="tab-pane fade" id="adminTab">
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5>匯出每月申請報表</h5>
+            <div class="row g-2 align-items-center">
+              <div class="col-auto">
+                <input type="month" id="reportMonth" class="form-control">
+              </div>
+              <div class="col-auto">
+                <button class="btn btn-primary" onclick="downloadReport()">下載 CSV 報表</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 替換為你的 Google Apps Script Web App URL
+  const GAS_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; 
+  
+  let currentUser = null;
+  let cart = [];
+
+  async function login() {
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
+
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "login", email, password })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      currentUser = { email, name: result.name, role: result.role };
+      document.getElementById("loginCard").classList.add("d-none");
+      document.getElementById("mainContent").classList.remove("d-none");
+      document.getElementById("userInfo").classList.remove("d-none");
+      document.getElementById("userNameDisplay").innerText = result.name;
+
+      if (result.role === "admin") {
+        document.getElementById("adminTabBtn").classList.remove("d-none");
+      }
+      loadProducts();
+    } else {
+      alert(result.message);
+    }
+  }
+
+  function logout() {
+    location.reload();
+  }
+
+  async function loadProducts() {
+    const res = await fetch(`${GAS_URL}?action=getProducts`);
+    const products = await res.json();
+    const container = document.getElementById("productList");
+    container.innerHTML = "";
+
+    products.forEach(p => {
+      container.innerHTML += `
+        <div class="col-md-6">
+          <div class="card p-2">
+            <h6>${p.name} <span class="badge bg-secondary">${p.category}</span></h6>
+            <p class="mb-1">剩餘數量：${p.stock}</p>
+            <button class="btn btn-sm btn-outline-primary" onclick="addToCart('${p.name}', ${p.stock})">加入申請單</button>
+          </div>
+        </div>`;
+    });
+  }
+
+  function addToCart(name, stock) {
+    const exist = cart.find(i => i.name === name);
+    if (exist) {
+      if (exist.qty < stock) exist.qty++;
+      else alert("已達庫存上限");
+    } else {
+      cart.push({ name, qty: 1 });
+    }
+    renderCart();
+  }
+
+  function renderCart() {
+    const list = document.getElementById("cartList");
+    list.innerHTML = "";
+    cart.forEach(item => {
+      list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center">
+        ${item.name}
+        <span class="badge bg-primary rounded-pill">${item.qty}</span>
+      </li>`;
+    });
+  }
+
+  async function submitOrder() {
+    if (cart.length === 0) return alert("請先選擇物資");
+
+    const payload = {
+      action: "createOrder",
+      userEmail: currentUser.email,
+      userName: currentUser.name,
+      items: cart
+    };
+
+    const res = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+    const result = await res.json();
+
+    if (result.success) {
+      alert("申請成功！已自動郵件通知物資管理同工。");
+      cart = [];
+      renderCart();
+      loadProducts();
+    }
+  }
+
+  async function downloadReport() {
+    const month = document.getElementById("reportMonth").value;
+    if (!month) return alert("請選擇月份");
+
+    const res = await fetch(`${GAS_URL}?action=getMonthlyReport&month=${month}`);
+    const data = await res.json();
+
+    if (data.length === 0) return alert("該月份無申請紀錄");
+
+    // 轉換為 CSV 並下載
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF單號,日期,Email,姓名,物資名稱,申請數量\n";
+    data.forEach(r => {
+      csvContent += `${r.orderId},${r.date},${r.userEmail},${r.userName},${r.itemName},${r.qty}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `物資申購報表_${month}.csv`);
+    document.body.appendChild(link);
+    link.click();
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
