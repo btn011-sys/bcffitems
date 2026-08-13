@@ -2,6 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>公司內部物資申購平台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -9,57 +10,75 @@
 
 <div class="container py-4">
   <!-- 頂部列 -->
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>內部物資申購系統</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <h2 class="h4 mb-0 fw-bold text-primary">內部物資申購系統</h2>
     <div id="userInfo" class="d-none">
-      <span id="userNameDisplay" class="me-2 fw-bold"></span>
+      <span id="userNameDisplay" class="me-2 fw-bold text-secondary"></span>
       <button class="btn btn-outline-danger btn-sm" onclick="logout()">登出</button>
     </div>
   </div>
 
   <!-- 1. 登入區塊 -->
-  <div id="loginCard" class="card mx-auto" style="max-width: 400px;">
-    <div class="card-body">
-      <h5 class="card-title mb-3">同仁登入</h5>
-      <input type="email" id="loginEmail" class="form-control mb-2" placeholder="Email">
-      <input type="password" id="loginPassword" class="form-control mb-3" placeholder="密碼">
-      <button class="btn btn-primary w-100" onclick="login()">登入</button>
+  <div id="loginCard" class="card mx-auto shadow-sm" style="max-width: 400px; margin-top: 50px;">
+    <div class="card-body p-4">
+      <h5 class="card-title mb-3 fw-bold text-center">同仁登入</h5>
+      <div class="mb-3">
+        <label class="form-label text-muted small">電子郵件</label>
+        <input type="email" id="loginEmail" class="form-control" placeholder="user@company.org">
+      </div>
+      <div class="mb-3">
+        <label class="form-label text-muted small">密碼</label>
+        <input type="password" id="loginPassword" class="form-control" placeholder="請輸入密碼">
+      </div>
+      <button class="btn btn-primary w-100 mt-2" onclick="login()">登入系統</button>
     </div>
   </div>
 
   <!-- 2. 主要功能區 (登入後顯示) -->
   <div id="mainContent" class="d-none">
     <!-- 頁籤導覽 -->
-    <ul class="nav nav-tabs mb-3">
+    <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
         <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#shopTab">物資申購</button>
       </li>
       <li class="nav-item d-none" id="adminTabBtn">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminTab">後台管理與報表</button>
+        <button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#adminTab">後台管理與報表</button>
       </li>
     </ul>
 
     <div class="tab-content">
       <!-- 申購區 -->
       <div class="tab-pane fade show active" id="shopTab">
-        <div class="row">
+        <div class="row g-4">
           <div class="col-md-8">
-            <h4>物資列表</h4>
-            <div id="productList" class="row g-3"></div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="mb-0 fw-bold">可可申購物資</h5>
+              <button class="btn btn-sm btn-outline-secondary" onclick="loadProducts()">重新整理清單</button>
+            </div>
+            <div id="productList" class="row g-3">
+              <div class="text-muted">載入物資清單中...</div>
+            </div>
           </div>
           <div class="col-md-4">
-            <h4>已選物資</h4>
-            <ul id="cartList" class="list-group mb-3"></ul>
-            <button class="btn btn-success w-100" onclick="submitOrder()">確認送出申請</button>
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h5 class="card-title fw-bold mb-3">申請清單</h5>
+                <ul id="cartList" class="list-group mb-3">
+                  <li class="list-group-item text-muted text-center py-3">尚未選擇物資</li>
+                </ul>
+                <button class="btn btn-success w-100" onclick="submitOrder()">送出申請單</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- 後台管理區 -->
       <div class="tab-pane fade" id="adminTab">
-        <div class="card mb-4">
+        <div class="card shadow-sm">
           <div class="card-body">
-            <h5>匯出每月申請報表</h5>
+            <h5 class="card-title fw-bold text-danger mb-3">匯出每月申購明細報表</h5>
+            <p class="text-muted small">請選擇要匯出的月份，系統將會產生該月份所有同仁申購物資的 CSV 明細檔案。</p>
             <div class="row g-2 align-items-center">
               <div class="col-auto">
                 <input type="month" id="reportMonth" class="form-control">
@@ -76,35 +95,44 @@
 </div>
 
 <script>
-  // 替換為你的 Google Apps Script Web App URL
-  const GAS_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; 
+  // 已帶入你的 Google Apps Script Web App API 網址
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwBBhH0RqhkWLyyqcgT86uYkuhpIbnAh5uH934wjd4priuU0jZ0bODNED1K08XMyqHZ/exec"; 
   
   let currentUser = null;
   let cart = [];
 
   async function login() {
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
 
-    const res = await fetch(GAS_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "login", email, password })
-    });
-    const result = await res.json();
+    if (!email || !password) {
+      alert("請填寫 Email 與密碼");
+      return;
+    }
 
-    if (result.success) {
-      currentUser = { email, name: result.name, role: result.role };
-      document.getElementById("loginCard").classList.add("d-none");
-      document.getElementById("mainContent").classList.remove("d-none");
-      document.getElementById("userInfo").classList.remove("d-none");
-      document.getElementById("userNameDisplay").innerText = result.name;
+    try {
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "login", email, password })
+      });
+      const result = await res.json();
 
-      if (result.role === "admin") {
-        document.getElementById("adminTabBtn").classList.remove("d-none");
+      if (result.success) {
+        currentUser = { email, name: result.name, role: result.role };
+        document.getElementById("loginCard").classList.add("d-none");
+        document.getElementById("mainContent").classList.remove("d-none");
+        document.getElementById("userInfo").classList.remove("d-none");
+        document.getElementById("userNameDisplay").innerText = result.name;
+
+        if (result.role === "admin") {
+          document.getElementById("adminTabBtn").classList.remove("d-none");
+        }
+        loadProducts();
+      } else {
+        alert(result.message || "帳號或密碼錯誤");
       }
-      loadProducts();
-    } else {
-      alert(result.message);
+    } catch (err) {
+      alert("連線失敗，請確認 API 設定或網路連線");
     }
   }
 
@@ -113,28 +141,49 @@
   }
 
   async function loadProducts() {
-    const res = await fetch(`${GAS_URL}?action=getProducts`);
-    const products = await res.json();
     const container = document.getElementById("productList");
-    container.innerHTML = "";
+    container.innerHTML = '<div class="text-muted">載入物資清單中...</div>';
 
-    products.forEach(p => {
-      container.innerHTML += `
-        <div class="col-md-6">
-          <div class="card p-2">
-            <h6>${p.name} <span class="badge bg-secondary">${p.category}</span></h6>
-            <p class="mb-1">剩餘數量：${p.stock}</p>
-            <button class="btn btn-sm btn-outline-primary" onclick="addToCart('${p.name}', ${p.stock})">加入申請單</button>
-          </div>
-        </div>`;
-    });
+    try {
+      const res = await fetch(`${GAS_URL}?action=getProducts`);
+      const products = await res.json();
+      container.innerHTML = "";
+
+      if (products.length === 0) {
+        container.innerHTML = '<div class="text-muted">目前沒有上架的物資</div>';
+        return;
+      }
+
+      products.forEach(p => {
+        container.innerHTML += `
+          <div class="col-md-6">
+            <div class="card h-100 shadow-sm border-0 bg-white">
+              <div class="card-body d-flex flex-column justify-content-between">
+                <div>
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold mb-0">${p.name}</h6>
+                    <span class="badge bg-light text-dark border">${p.category}</span>
+                  </div>
+                  <p class="text-muted small mb-2">庫存剩餘：<strong class="text-primary">${p.stock}</strong></p>
+                </div>
+                <button class="btn btn-sm btn-outline-primary mt-2 w-100" onclick="addToCart('${p.name}', ${p.stock})">加入申請單</button>
+              </div>
+            </div>
+          </div>`;
+      });
+    } catch (err) {
+      container.innerHTML = '<div class="text-danger">無法載入物資，請確認後台試算表權限。</div>';
+    }
   }
 
   function addToCart(name, stock) {
     const exist = cart.find(i => i.name === name);
     if (exist) {
-      if (exist.qty < stock) exist.qty++;
-      else alert("已達庫存上限");
+      if (exist.qty < stock) {
+        exist.qty++;
+      } else {
+        alert("已達目前庫存上限！");
+      }
     } else {
       cart.push({ name, qty: 1 });
     }
@@ -144,16 +193,31 @@
   function renderCart() {
     const list = document.getElementById("cartList");
     list.innerHTML = "";
-    cart.forEach(item => {
-      list.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center">
-        ${item.name}
-        <span class="badge bg-primary rounded-pill">${item.qty}</span>
-      </li>`;
+
+    if (cart.length === 0) {
+      list.innerHTML = '<li class="list-group-item text-muted text-center py-3">尚未選擇物資</li>';
+      return;
+    }
+
+    cart.forEach((item, index) => {
+      list.innerHTML += `
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <div>${item.name}</div>
+            <small class="text-muted">數量: ${item.qty}</small>
+          </div>
+          <button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})">移除</button>
+        </li>`;
     });
   }
 
+  function removeFromCart(index) {
+    cart.splice(index, 1);
+    renderCart();
+  }
+
   async function submitOrder() {
-    if (cart.length === 0) return alert("請先選擇物資");
+    if (cart.length === 0) return alert("請先選擇物資！");
 
     const payload = {
       action: "createOrder",
@@ -162,38 +226,48 @@
       items: cart
     };
 
-    const res = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
-    const result = await res.json();
+    try {
+      const res = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
+      const result = await res.json();
 
-    if (result.success) {
-      alert("申請成功！已自動郵件通知物資管理同工。");
-      cart = [];
-      renderCart();
-      loadProducts();
+      if (result.success) {
+        alert("申請完成！已發送 Mail 通知的管理同工。");
+        cart = [];
+        renderCart();
+        loadProducts();
+      } else {
+        alert("申請失敗，請再試一次。");
+      }
+    } catch (err) {
+      alert("提交發生錯誤，請檢查連線。");
     }
   }
 
   async function downloadReport() {
     const month = document.getElementById("reportMonth").value;
-    if (!month) return alert("請選擇月份");
+    if (!month) return alert("請選擇要匯出的月份");
 
-    const res = await fetch(`${GAS_URL}?action=getMonthlyReport&month=${month}`);
-    const data = await res.json();
+    try {
+      const res = await fetch(`${GAS_URL}?action=getMonthlyReport&month=${month}`);
+      const data = await res.json();
 
-    if (data.length === 0) return alert("該月份無申請紀錄");
+      if (data.length === 0) return alert("該月份查無申購紀錄");
 
-    // 轉換為 CSV 並下載
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF單號,日期,Email,姓名,物資名稱,申請數量\n";
-    data.forEach(r => {
-      csvContent += `${r.orderId},${r.date},${r.userEmail},${r.userName},${r.itemName},${r.qty}\n`;
-    });
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF單號,日期,Email,姓名,物資名稱,申請數量\n";
+      data.forEach(r => {
+        csvContent += `${r.orderId},${r.date},${r.userEmail},${r.userName},${r.itemName},${r.qty}\n`;
+      });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `物資申購報表_${month}.csv`);
-    document.body.appendChild(link);
-    link.click();
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `物資申購明細報表_${month}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert("報表產生失敗，請確認後台 GAS 回傳格式。");
+    }
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
