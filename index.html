@@ -3,378 +3,427 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BCFF內部物資申請平台</title>
+  <title>行政物資申購與管理系統</title>
+  <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .card {
+      border: none;
+      box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    .item-card {
+      transition: transform 0.2s;
+    }
+    .item-card:hover {
+      transform: translateY(-3px);
+    }
+    /* 報表列印專用樣式 */
     @media print {
-      body * { visibility: hidden; }
-      #printableReportArea, #printableReportArea * { visibility: visible; }
-      #printableReportArea { position: absolute; left: 0; top: 0; width: 100%; }
-      .no-print { display: none !important; }
+      .no-print, nav, .btn, input, select, .card-header, #loginSection, #userSection {
+        display: none !important;
+      }
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      .container {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .card {
+        box-shadow: none !important;
+        border: none !important;
+      }
+      /* 印表時隱藏報表中的「備註」欄位 (第 4 欄) */
+      #reportTable th:nth-child(4),
+      #reportTable td:nth-child(4) {
+        display: none !important;
+      }
+      table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+      }
+      th, td {
+        border: 1px solid #000 !important;
+        padding: 8px !important;
+        vertical-align: middle !important;
+      }
+      .print-title {
+        display: block !important;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 15px;
+      }
+    }
+    .print-title {
+      display: none;
     }
   </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container py-4">
-  <!-- 頂部列 -->
-  <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-    <h2 class="h4 mb-0 fw-bold text-primary">BCFF物資申請系統</h2>
-    <div id="userInfo" class="d-none">
-      <span id="userNameDisplay" class="me-2 fw-bold text-secondary"></span>
-      <button class="btn btn-outline-danger btn-sm" onclick="logout()">登出</button>
-    </div>
-  </div>
-
-  <!-- 1. 登入區塊 -->
-  <div id="loginCard" class="card mx-auto shadow-sm" style="max-width: 400px; margin-top: 50px;">
-    <div class="card-body p-4">
-      <h5 class="card-title mb-3 fw-bold text-center">同仁登入</h5>
-      <div class="mb-3">
-        <label class="form-label text-muted small">電子郵件</label>
-        <input type="email" id="loginEmail" class="form-control" placeholder="user@company.org">
+  <!-- 導覽列 -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary no-print">
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="#">行政物資申購系統</a>
+      <div class="d-flex align-items-center text-white" id="userInfo">
+        <!-- 使用者資訊動態載入 -->
       </div>
-      <div class="mb-3">
-        <label class="form-label text-muted small">密碼</label>
-        <input type="password" id="loginPassword" class="form-control" placeholder="請輸入密碼">
-      </div>
-      <button class="btn btn-primary w-100 mt-2" id="loginBtn" onclick="login()">登入系統</button>
     </div>
-  </div>
+  </nav>
 
-  <!-- 2. 主要功能區 (登入後顯示) -->
-  <div id="mainContent" class="d-none">
-    <!-- 頁籤導覽 -->
-    <ul class="nav nav-tabs mb-4">
-      <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#shopTab">物資申購</button>
-      </li>
-      <li class="nav-item d-none" id="adminTabBtn">
-        <button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#adminTab">後台管理與報表</button>
-      </li>
-    </ul>
-
-    <div class="tab-content">
-      <!-- 申購區 -->
-      <div class="tab-pane fade show active" id="shopTab">
-        <div class="row g-4">
-          <div class="col-md-8">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="mb-0 fw-bold">可申購物資</h5>
-              <button class="btn btn-sm btn-outline-secondary" onclick="loadProducts()">重新整理清單</button>
-            </div>
-            
-            <!-- 搜尋關鍵字欄位 -->
+  <div class="container my-4">
+    <!-- 1. 登入區塊 -->
+    <div id="loginSection" class="row justify-content-center">
+      <div class="col-md-5">
+        <div class="card p-4">
+          <h4 class="card-title text-center mb-4 fw-bold">系統登入</h4>
+          <form id="loginForm">
             <div class="mb-3">
-              <input type="text" id="searchInput" class="form-control" placeholder="🔍 搜尋物資名稱或分類..." onkeyup="filterProducts()">
+              <label class="form-label">Email 帳號</label>
+              <input type="email" id="loginEmail" class="form-control" required placeholder="user@domain.org">
             </div>
-
-            <div id="productList" class="row g-3">
-              <div class="text-muted">載入物資清單中...</div>
+            <div class="mb-3">
+              <label class="form-label">密碼</label>
+              <input type="password" id="loginPassword" class="form-control" required>
             </div>
-          </div>
+            <button type="submit" id="btnLogin" class="btn btn-primary w-100">登入</button>
+          </form>
+        </div>
+      </div>
+    </div>
 
-          <div class="col-md-4">
-            <div class="card shadow-sm">
-              <div class="card-body">
-                <h5 class="card-title fw-bold mb-3">申請清單</h5>
-                <ul id="cartList" class="list-group mb-3">
-                  <li class="list-group-item text-muted text-center py-3">尚未選擇物資</li>
-                </ul>
-
-                <!-- 訂單備註欄位 -->
-                <div class="mb-3">
-                  <label class="form-label text-muted small fw-bold">申請備註／用途說明</label>
-                  <textarea id="orderNote" class="form-control" rows="2" placeholder="請填寫用途或特別需求..."></textarea>
-                </div>
-
-                <button class="btn btn-success w-100" id="submitBtn" onclick="submitOrder()">送出申請單</button>
+    <!-- 2. 同仁物資申購區塊 -->
+    <div id="userSection" class="d-none">
+      <div class="row">
+        <!-- 左側：物資清單與搜尋 -->
+        <div class="col-md-8 mb-4">
+          <div class="card p-3 mb-3">
+            <div class="row g-2">
+              <div class="col-md-8">
+                <input type="text" id="searchInput" class="form-control" placeholder="搜尋物資名稱或分類...">
+              </div>
+              <div class="col-md-4">
+                <select id="categorySelect" class="form-select">
+                  <option value="">全部分類</option>
+                </select>
               </div>
             </div>
+          </div>
+          <div id="productGrid" class="row row-cols-1 row-cols-md-3 g-3">
+            <!-- 物資卡片動態載入 -->
+          </div>
+        </div>
+
+        <!-- 右側：申購清單 (購物車) -->
+        <div class="col-md-4">
+          <div class="card p-3 sticky-top" style="top: 20px;">
+            <h5 class="fw-bold mb-3">申購清單</h5>
+            <div id="cartList" class="mb-3" style="max-height: 300px; overflow-y: auto;">
+              <p class="text-muted text-center py-3">尚未選擇任何物資</p>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">用途說明 / 備註：</label>
+              <textarea id="orderNote" class="form-control" rows="2" placeholder="請註明用途或領用單位..."></textarea>
+            </div>
+            <button id="btnSubmitOrder" class="btn btn-success w-100" onclick="submitOrder()" disabled>送出申購單</button>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- 後台管理區 -->
-      <div class="tab-pane fade" id="adminTab">
-        <div class="card shadow-sm mb-4">
-          <div class="card-body">
-            <h5 class="card-title fw-bold text-danger mb-3">產生每月申購核銷報表</h5>
-            <p class="text-muted small">選擇月份後將自動匯出含「申請人簽名欄」與「單位主管簽核欄」的報表，可直接列印或另存 PDF。</p>
-            <div class="row g-2 align-items-center">
-              <div class="col-auto">
-                <input type="month" id="reportMonth" class="form-control">
-              </div>
-              <div class="col-auto">
-                <button class="btn btn-primary" onclick="generateReport()">預覽並列印報表</button>
-              </div>
-            </div>
+    <!-- 3. 管理者月報表區塊 -->
+    <div id="adminSection" class="d-none">
+      <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+          <h4 class="fw-bold mb-0">月度物資申購簽收報表</h4>
+          <div class="d-flex gap-2">
+            <input type="month" id="reportMonth" class="form-control">
+            <button class="btn btn-primary" onclick="loadMonthlyReport()">查詢</button>
+            <button class="btn btn-secondary" onclick="window.print()">列印 / 另存PDF</button>
           </div>
         </div>
 
-        <!-- 報表列印預覽區域 -->
-        <div id="printableReportArea" class="d-none bg-white p-4 border rounded">
-          <div class="d-flex justify-content-between align-items-center mb-3 no-print">
-            <h6 class="fw-bold text-success mb-0">報表預覽區</h6>
-            <button class="btn btn-success btn-sm" onclick="window.print()">🖨️ 列印 / 存為 PDF</button>
-          </div>
-          
-          <div class="text-center mb-4">
-            <h3 class="fw-bold mb-1">伯大尼兒少家庭基金會物資申請月份明細表</h3>
-            <p class="text-muted" id="reportTitleMonth">月份：</p>
-          </div>
+        <!-- 列印時顯示的標題 -->
+        <div class="print-title">
+          <span id="printTitleText">行政物資申購月報表</span>
+        </div>
 
-          <table class="table table-bordered align-middle">
+        <!-- 報表表格 -->
+        <div class="table-responsive">
+          <table id="reportTable" class="table table-bordered align-middle">
             <thead class="table-light">
-              <tr class="text-center">
-                <th style="width: 12%;">申請日期</th>
-                <th style="width: 12%;">申請同仁</th>
-                <th>物資名稱</th>
-                <th style="width: 8%;">數量</th>
-                <th style="width: 25%;">備註用途</th>
-                <th style="width: 18%;">申請人簽名欄</th>
+              <tr>
+                <th style="width: 15%;">申請日期</th>
+                <th style="width: 15%;">申請人</th>
+                <th style="width: 35%;">申購品項與數量</th>
+                <th style="width: 15%;">備註</th>
+                <th style="width: 20%;">領取人簽名</th>
               </tr>
             </thead>
             <tbody id="reportTableBody">
+              <tr><td colspan="5" class="text-center text-muted">請選擇月份進行查詢</td></tr>
             </tbody>
           </table>
-
-          <!-- 簽核區塊 -->
-          <div class="row mt-5 pt-4 text-center" style="font-size: 1.1rem;">
-            <div class="col-4">
-              <p class="fw-bold mb-5">執行長：________________</p>
-            </div>
-            <div class="col-4">
-              <p class="fw-bold mb-5">主管：________________</p>
-            </div>
-            <div class="col-4">
-              <p class="fw-bold mb-5">製表：________________</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwBBhH0RqhkWLyyqcgT86uYkuhpIbnAh5uH934wjd4priuU0jZ0bODNED1K08XMyqHZ/exec"; 
-  
-  let currentUser = null;
-  let cart = [];
-  let allProducts = []; // 儲存所有物資以利前端搜尋
+  <script>
+    // ⚠️ 請填入您的 Google Apps Script 部署 URL
+    const GAS_URL = "YOUR_GAS_DEPLOYMENT_URL_HERE";
 
-  async function postToGAS(data) {
-    const response = await fetch(GAS_URL, {
-      method: "POST",
-      redirect: "follow",
-      body: JSON.stringify(data)
+    let currentUser = null;
+    let productsData = [];
+    let cart = [];
+
+    // 初始化
+    document.addEventListener("DOMContentLoaded", () => {
+      // 設定預設月份為當月
+      const now = new Date();
+      const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0');
+      document.getElementById("reportMonth").value = currentMonth;
+
+      // 綁定搜尋與篩選事件
+      document.getElementById("searchInput").addEventListener("input", filterProducts);
+      document.getElementById("categorySelect").addEventListener("change", filterProducts);
+
+      // 綁定登入事件
+      document.getElementById("loginForm").addEventListener("submit", handleLogin);
     });
-    return await response.json();
-  }
 
-  async function login() {
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value.trim();
+    // 1. 處理登入
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("loginEmail").value;
+      const password = document.getElementById("loginPassword").value;
+      const btn = document.getElementById("btnLogin");
+      
+      btn.disabled = true;
+      btn.innerText = "登入中...";
 
-    if (!email || !password) {
-      alert("請填寫 Email 與密碼");
-      return;
-    }
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "login", email, password })
+        });
+        const result = await res.json();
 
-    const btn = document.getElementById("loginBtn");
-    btn.disabled = true;
-    btn.innerText = "驗證中...";
+        if (result.success) {
+          currentUser = { email, name: result.name, role: result.role };
+          document.getElementById("loginSection").classList.add("d-none");
+          
+          let navHtml = `<span class="me-3">${currentUser.name} (${currentUser.role === 'admin' ? '管理者' : '同仁'})</span>
+                         <button class="btn btn-outline-light btn-sm" onclick="logout()">登出</button>`;
+          document.getElementById("userInfo").innerHTML = navHtml;
 
-    try {
-      const result = await postToGAS({ action: "login", email, password });
-
-      if (result.success) {
-        currentUser = { email, name: result.name, role: result.role };
-        document.getElementById("loginCard").classList.add("d-none");
-        document.getElementById("mainContent").classList.remove("d-none");
-        document.getElementById("userInfo").classList.remove("d-none");
-        document.getElementById("userNameDisplay").innerText = result.name;
-
-        if (result.role === "admin") {
-          document.getElementById("adminTabBtn").classList.remove("d-none");
+          if (currentUser.role === "admin") {
+            document.getElementById("adminSection").classList.remove("d-none");
+            loadMonthlyReport();
+          } else {
+            document.getElementById("userSection").classList.remove("d-none");
+            loadProducts();
+          }
+        } else {
+          alert("登入失敗：" + result.message);
         }
-        loadProducts();
-      } else {
-        alert(result.message || "帳號或密碼錯誤");
+      } catch (err) {
+        alert("連線錯誤：" + err);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "登入";
       }
-    } catch (err) {
-      alert("連線失敗！請確認 Apps Script 部署權限。");
-    } finally {
-      btn.disabled = false;
-      btn.innerText = "登入系統";
-    }
-  }
-
-  function logout() {
-    location.reload();
-  }
-
-  async function loadProducts() {
-    const container = document.getElementById("productList");
-    container.innerHTML = '<div class="text-muted">載入物資清單中...</div>';
-
-    try {
-      const res = await fetch(`${GAS_URL}?action=getProducts`);
-      allProducts = await res.json();
-      renderProducts(allProducts);
-    } catch (err) {
-      container.innerHTML = '<div class="text-danger">無法載入物資，請確認後台試算表。</div>';
-    }
-  }
-
-  function renderProducts(products) {
-    const container = document.getElementById("productList");
-    container.innerHTML = "";
-
-    if (products.length === 0) {
-      container.innerHTML = '<div class="text-muted">未找到符合的物資</div>';
-      return;
     }
 
-    products.forEach(p => {
-      container.innerHTML += `
-        <div class="col-md-6">
-          <div class="card h-100 shadow-sm border-0 bg-white">
-            <div class="card-body d-flex flex-column justify-content-between">
-              <div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h6 class="fw-bold mb-0">${p.name}</h6>
-                  <span class="badge bg-light text-dark border">${p.category}</span>
-                </div>
-                <p class="text-muted small mb-2">庫存剩餘：<strong class="text-primary">${p.stock}</strong></p>
-              </div>
-              <button class="btn btn-sm btn-outline-primary mt-2 w-100" onclick="addToCart('${p.name}', ${p.stock})">加入申請單</button>
-            </div>
+    function logout() {
+      location.reload();
+    }
+
+    // 2. 載入與渲染物資
+    async function loadProducts() {
+      try {
+        const res = await fetch(`${GAS_URL}?action=getProducts`);
+        productsData = await res.json();
+        
+        // 建立分類選單
+        const categories = [...new Set(productsData.map(p => p.category))];
+        const catSelect = document.getElementById("categorySelect");
+        catSelect.innerHTML = `<option value="">全部分類</option>` + 
+          categories.map(c => `<option value="${c}">${c}</option>`).join("");
+
+        renderProducts(productsData);
+      } catch (err) {
+        console.error("載入物資失敗", err);
+      }
+    }
+
+    function renderProducts(list) {
+      const grid = document.getElementById("productGrid");
+      grid.innerHTML = list.map(item => `
+        <div class="col">
+          <div class="card h-100 item-card p-3">
+            <span class="badge bg-secondary mb-2 align-self-start">${item.category}</span>
+            <h6 class="fw-bold">${item.name}</h6>
+            <p class="text-muted small mb-2">剩餘庫存：${item.stock}</p>
+            <button class="btn btn-outline-primary btn-sm mt-auto" 
+                    onclick="addToCart('${item.name}')" 
+                    ${item.stock <= 0 ? 'disabled' : ''}>
+              ${item.stock > 0 ? '加入申購' : '庫存不足'}
+            </button>
           </div>
-        </div>`;
-    });
-  }
-
-  // 即時搜尋過濾功能
-  function filterProducts() {
-    const keyword = document.getElementById("searchInput").value.toLowerCase().trim();
-    const filtered = allProducts.filter(p => 
-      p.name.toLowerCase().includes(keyword) || 
-      p.category.toLowerCase().includes(keyword)
-    );
-    renderProducts(filtered);
-  }
-
-  function addToCart(name, stock) {
-    const exist = cart.find(i => i.name === name);
-    if (exist) {
-      if (exist.qty < stock) {
-        exist.qty++;
-      } else {
-        alert("已達目前庫存上限！");
-      }
-    } else {
-      cart.push({ name, qty: 1 });
-    }
-    renderCart();
-  }
-
-  function renderCart() {
-    const list = document.getElementById("cartList");
-    list.innerHTML = "";
-
-    if (cart.length === 0) {
-      list.innerHTML = '<li class="list-group-item text-muted text-center py-3">尚未選擇物資</li>';
-      return;
+        </div>
+      `).join("");
     }
 
-    cart.forEach((item, index) => {
-      list.innerHTML += `
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <div>${item.name}</div>
-            <small class="text-muted">數量: ${item.qty}</small>
-          </div>
-          <button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})">移除</button>
-        </li>`;
-    });
-  }
+    function filterProducts() {
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      const category = document.getElementById("categorySelect").value;
 
-  function removeFromCart(index) {
-    cart.splice(index, 1);
-    renderCart();
-  }
-
-  async function submitOrder() {
-    if (cart.length === 0) return alert("請先選擇物資！");
-
-    const note = document.getElementById("orderNote").value.trim();
-    const btn = document.getElementById("submitBtn");
-    btn.disabled = true;
-    btn.innerText = "提交中...";
-
-    const payload = {
-      action: "createOrder",
-      userEmail: currentUser.email,
-      userName: currentUser.name,
-      items: cart,
-      note: note
-    };
-
-    try {
-      const result = await postToGAS(payload);
-
-      if (result.success) {
-        alert("申請完成！已發送 Mail 通知管理同工。");
-        cart = [];
-        document.getElementById("orderNote").value = "";
-        renderCart();
-        loadProducts();
-      } else {
-        alert("申請失敗，請再試一次。");
-      }
-    } catch (err) {
-      alert("提交發生錯誤，請檢查網路連線。");
-    } finally {
-      btn.disabled = false;
-      btn.innerText = "送出申請單";
-    }
-  }
-
-  // 產生含簽名欄與三級主管簽核區的報表
-  async function generateReport() {
-    const month = document.getElementById("reportMonth").value;
-    if (!month) return alert("請選擇要匯出的月份");
-
-    try {
-      const res = await fetch(`${GAS_URL}?action=getMonthlyReport&month=${month}`);
-      const data = await res.json();
-
-      if (data.length === 0) return alert("該月份查無申購紀錄");
-
-      document.getElementById("reportTitleMonth").innerText = `申購月份：${month}`;
-      const tbody = document.getElementById("reportTableBody");
-      tbody.innerHTML = "";
-
-      data.forEach(r => {
-        tbody.innerHTML += `
-          <tr>
-            <td class="text-center">${r.date.split(" ")[0]}</td>
-            <td class="text-center">${r.userName}</td>
-            <td>${r.itemName}</td>
-            <td class="text-center">${r.qty}</td>
-            <td>${r.note}</td>
-            <td class="text-center" style="height: 45px;"></td>
-          </tr>`;
+      const filtered = productsData.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search) || p.category.toLowerCase().includes(search);
+        const matchCat = category === "" || p.category === category;
+        return matchSearch && matchCat;
       });
 
-      document.getElementById("printableReportArea").classList.remove("d-none");
-    } catch (err) {
-      alert("報表產生失敗，請確認後台回傳格式。");
+      renderProducts(filtered);
     }
-  }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    // 3. 購物車邏輯
+    function addToCart(itemName) {
+      const product = productsData.find(p => p.name === itemName);
+      if (!product) return;
+
+      const cartItem = cart.find(c => c.name === itemName);
+      if (cartItem) {
+        if (cartItem.qty < product.stock) {
+          cartItem.qty++;
+        } else {
+          alert("已達庫存上限");
+        }
+      } else {
+        cart.push({ name: itemName, qty: 1, stock: product.stock });
+      }
+      renderCart();
+    }
+
+    function updateQty(itemName, delta) {
+      const item = cart.find(c => c.name === itemName);
+      if (!item) return;
+
+      item.qty += delta;
+      if (item.qty <= 0) {
+        cart = cart.filter(c => c.name !== itemName);
+      } else if (item.qty > item.stock) {
+        item.qty = item.stock;
+        alert("已達庫存上限");
+      }
+      renderCart();
+    }
+
+    function renderCart() {
+      const list = document.getElementById("cartList");
+      const btn = document.getElementById("btnSubmitOrder");
+
+      if (cart.length === 0) {
+        list.innerHTML = `<p class="text-muted text-center py-3">尚未選擇任何物資</p>`;
+        btn.disabled = true;
+        return;
+      }
+
+      btn.disabled = false;
+      list.innerHTML = cart.map(item => `
+        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+          <div>
+            <div class="fw-bold">${item.name}</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-outline-secondary px-2" onclick="updateQty('${item.name}', -1)">-</button>
+            <span>${item.qty}</span>
+            <button class="btn btn-sm btn-outline-secondary px-2" onclick="updateQty('${item.name}', 1)">+</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // 4. 提交申購單
+    async function submitOrder() {
+      const note = document.getElementById("orderNote").value;
+      const btn = document.getElementById("btnSubmitOrder");
+
+      btn.disabled = true;
+      btn.innerText = "提交中...";
+
+      const payload = {
+        action: "createOrder",
+        userEmail: currentUser.email,
+        userName: currentUser.name,
+        items: cart,
+        note: note
+      };
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          alert("申購單已成功送出！");
+          cart = [];
+          document.getElementById("orderNote").value = "";
+          renderCart();
+          loadProducts(); // 重新載入最新庫存
+        } else {
+          alert("送出失敗：" + result.message);
+        }
+      } catch (err) {
+        alert("送出失敗：" + err);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "送出申購單";
+      }
+    }
+
+    // 5. 載入管理者月報表 (自動按日期與同仁合併)
+    async function loadMonthlyReport() {
+      const month = document.getElementById("reportMonth").value;
+      if (!month) return;
+
+      document.getElementById("printTitleText").innerText = `${month} 行政物資申購月報表`;
+      const tbody = document.getElementById("reportTableBody");
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">載入中...</td></tr>`;
+
+      try {
+        const res = await fetch(`${GAS_URL}?action=getMonthlyReport&month=${month}`);
+        const data = await res.json();
+
+        if (data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">該月份無申購紀錄</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = data.map(row => `
+          <tr>
+            <td>${row.date}</td>
+            <td>${row.userName}</td>
+            <td style="text-align: left; line-height: 1.6;">${row.itemName}</td>
+            <td>${row.note || "-"}</td>
+            <td style="height: 45px;"></td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">載入報表失敗</td></tr>`;
+      }
+    }
+  </script>
 </body>
 </html>
