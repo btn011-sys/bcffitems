@@ -30,7 +30,7 @@
         <label class="form-label text-muted small">密碼</label>
         <input type="password" id="loginPassword" class="form-control" placeholder="請輸入密碼">
       </div>
-      <button class="btn btn-primary w-100 mt-2" onclick="login()">登入系統</button>
+      <button class="btn btn-primary w-100 mt-2" id="loginBtn" onclick="login()">登入系統</button>
     </div>
   </div>
 
@@ -52,7 +52,7 @@
         <div class="row g-4">
           <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="mb-0 fw-bold">可可申購物資</h5>
+              <h5 class="mb-0 fw-bold">可申購物資</h5>
               <button class="btn btn-sm btn-outline-secondary" onclick="loadProducts()">重新整理清單</button>
             </div>
             <div id="productList" class="row g-3">
@@ -66,7 +66,7 @@
                 <ul id="cartList" class="list-group mb-3">
                   <li class="list-group-item text-muted text-center py-3">尚未選擇物資</li>
                 </ul>
-                <button class="btn btn-success w-100" onclick="submitOrder()">送出申請單</button>
+                <button class="btn btn-success w-100" id="submitBtn" onclick="submitOrder()">送出申請單</button>
               </div>
             </div>
           </div>
@@ -95,53 +95,60 @@
 </div>
 
 <script>
-  // 已帶入你的 Google Apps Script Web App API 網址
+  // Google Apps Script Web App API 網址
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwBBhH0RqhkWLyyqcgT86uYkuhpIbnAh5uH934wjd4priuU0jZ0bODNED1K08XMyqHZ/exec"; 
   
   let currentUser = null;
   let cart = [];
 
- sync function login() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const password = document.getElementById("loginPassword").value.trim();
-
-  if (!email || !password) {
-    alert("請填寫 Email 與密碼");
-    return;
-  }
-
-  try {
-    // 加上 mode 與 redirect，並以 text/plain 格式傳送以避開嚴格 CORS 檢查
-    const res = await fetch(GAS_URL, {
+  // 通用的 POST 請求發送器（專門避開 CORS 預檢問題）
+  async function postToGAS(data) {
+    const response = await fetch(GAS_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
       redirect: "follow",
-      body: JSON.stringify({ action: "login", email, password })
+      body: JSON.stringify(data)
     });
-    
-    const result = await res.json();
-
-    if (result.success) {
-      currentUser = { email, name: result.name, role: result.role };
-      document.getElementById("loginCard").classList.add("d-none");
-      document.getElementById("mainContent").classList.remove("d-none");
-      document.getElementById("userInfo").classList.remove("d-none");
-      document.getElementById("userNameDisplay").innerText = result.name;
-
-      if (result.role === "admin") {
-        document.getElementById("adminTabBtn").classList.remove("d-none");
-      }
-      loadProducts();
-    } else {
-      alert(result.message || "帳號或密碼錯誤");
-    }
-  } catch (err) {
-    console.error(err);
-    alert("連線失敗，請確認 API 設定或網路連線");
+    return await response.json();
   }
-}
+
+  async function login() {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
+
+    if (!email || !password) {
+      alert("請填寫 Email 與密碼");
+      return;
+    }
+
+    const btn = document.getElementById("loginBtn");
+    btn.disabled = true;
+    btn.innerText = "驗證中...";
+
+    try {
+      const result = await postToGAS({ action: "login", email, password });
+
+      if (result.success) {
+        currentUser = { email, name: result.name, role: result.role };
+        document.getElementById("loginCard").classList.add("d-none");
+        document.getElementById("mainContent").classList.remove("d-none");
+        document.getElementById("userInfo").classList.remove("d-none");
+        document.getElementById("userNameDisplay").innerText = result.name;
+
+        if (result.role === "admin") {
+          document.getElementById("adminTabBtn").classList.remove("d-none");
+        }
+        loadProducts();
+      } else {
+        alert(result.message || "帳號或密碼錯誤");
+      }
+    } catch (err) {
+      console.error("Login Error:", err);
+      alert("連線失敗！請確認 Google Apps Script 部署設定為「所有人 (Anyone)」存取權。");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "登入系統";
+    }
+  }
 
   function logout() {
     location.reload();
@@ -179,7 +186,8 @@
           </div>`;
       });
     } catch (err) {
-      container.innerHTML = '<div class="text-danger">無法載入物資，請確認後台試算表權限。</div>';
+      console.error("Load Products Error:", err);
+      container.innerHTML = '<div class="text-danger">無法載入物資，請確認後台試算表權限與 GAS 部署。</div>';
     }
   }
 
@@ -226,6 +234,10 @@
   async function submitOrder() {
     if (cart.length === 0) return alert("請先選擇物資！");
 
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true;
+    btn.innerText = "提交中...";
+
     const payload = {
       action: "createOrder",
       userEmail: currentUser.email,
@@ -234,8 +246,7 @@
     };
 
     try {
-      const res = await fetch(GAS_URL, { method: "POST", body: JSON.stringify(payload) });
-      const result = await res.json();
+      const result = await postToGAS(payload);
 
       if (result.success) {
         alert("申請完成！已發送 Mail 通知的管理同工。");
@@ -246,7 +257,11 @@
         alert("申請失敗，請再試一次。");
       }
     } catch (err) {
-      alert("提交發生錯誤，請檢查連線。");
+      console.error("Submit Order Error:", err);
+      alert("提交發生錯誤，請檢查網路連線。");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "送出申請單";
     }
   }
 
@@ -273,7 +288,8 @@
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      alert("報表產生失敗，請確認後台 GAS 回傳格式。");
+      console.error("Report Error:", err);
+      alert("報表產生失敗，請確認後台回傳格式。");
     }
   }
 </script>
