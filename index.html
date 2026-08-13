@@ -101,40 +101,47 @@
   let currentUser = null;
   let cart = [];
 
-  async function login() {
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value.trim();
+ sync function login() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
 
-    if (!email || !password) {
-      alert("請填寫 Email 與密碼");
-      return;
-    }
-
-    try {
-      const res = await fetch(GAS_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "login", email, password })
-      });
-      const result = await res.json();
-
-      if (result.success) {
-        currentUser = { email, name: result.name, role: result.role };
-        document.getElementById("loginCard").classList.add("d-none");
-        document.getElementById("mainContent").classList.remove("d-none");
-        document.getElementById("userInfo").classList.remove("d-none");
-        document.getElementById("userNameDisplay").innerText = result.name;
-
-        if (result.role === "admin") {
-          document.getElementById("adminTabBtn").classList.remove("d-none");
-        }
-        loadProducts();
-      } else {
-        alert(result.message || "帳號或密碼錯誤");
-      }
-    } catch (err) {
-      alert("連線失敗，請確認 API 設定或網路連線");
-    }
+  if (!email || !password) {
+    alert("請填寫 Email 與密碼");
+    return;
   }
+
+  try {
+    // 加上 mode 與 redirect，並以 text/plain 格式傳送以避開嚴格 CORS 檢查
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      redirect: "follow",
+      body: JSON.stringify({ action: "login", email, password })
+    });
+    
+    const result = await res.json();
+
+    if (result.success) {
+      currentUser = { email, name: result.name, role: result.role };
+      document.getElementById("loginCard").classList.add("d-none");
+      document.getElementById("mainContent").classList.remove("d-none");
+      document.getElementById("userInfo").classList.remove("d-none");
+      document.getElementById("userNameDisplay").innerText = result.name;
+
+      if (result.role === "admin") {
+        document.getElementById("adminTabBtn").classList.remove("d-none");
+      }
+      loadProducts();
+    } else {
+      alert(result.message || "帳號或密碼錯誤");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("連線失敗，請確認 API 設定或網路連線");
+  }
+}
 
   function logout() {
     location.reload();
