@@ -11,6 +11,12 @@
       #printableReportArea, #printableReportArea * { visibility: visible; }
       #printableReportArea { position: absolute; left: 0; top: 0; width: 100%; }
       .no-print { display: none !important; }
+
+      /* 印表時自動隱藏「備註用途」欄位 (第 4 欄) */
+      #reportTable th:nth-child(4),
+      #reportTable td:nth-child(4) {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -124,15 +130,14 @@
             <p class="text-muted" id="reportTitleMonth">月份：</p>
           </div>
 
-          <table class="table table-bordered align-middle">
+          <table class="table table-bordered align-middle" id="reportTable">
             <thead class="table-light">
               <tr class="text-center">
-                <th style="width: 12%;">申請日期</th>
-                <th style="width: 12%;">申請同仁</th>
-                <th>物資名稱</th>
-                <th style="width: 8%;">數量</th>
-                <th style="width: 25%;">備註用途</th>
-                <th style="width: 18%;">申請人簽名欄</th>
+                <th style="width: 15%;">申請日期</th>
+                <th style="width: 15%;">申請同仁</th>
+                <th style="width: 35%;">物資名稱與數量</th>
+                <th style="width: 15%;">備註用途</th>
+                <th style="width: 20%;">申請人簽名欄</th>
               </tr>
             </thead>
             <tbody id="reportTableBody">
@@ -342,30 +347,57 @@
     }
   }
 
-  // 產生含簽名欄與三級主管簽核區的報表
+  // 產生含簽名欄與三級主管簽核區的報表（同日同一人整合邏輯）
   async function generateReport() {
     const month = document.getElementById("reportMonth").value;
     if (!month) return alert("請選擇要匯出的月份");
 
     try {
       const res = await fetch(`${GAS_URL}?action=getMonthlyReport&month=${month}`);
-      const data = await res.json();
+      const rawData = await res.json();
 
-      if (data.length === 0) return alert("該月份查無申購紀錄");
+      if (!rawData || rawData.length === 0) return alert("該月份查無申購紀錄");
 
       document.getElementById("reportTitleMonth").innerText = `申購月份：${month}`;
       const tbody = document.getElementById("reportTableBody");
       tbody.innerHTML = "";
 
-      data.forEach(r => {
+      // 1. 使用 Map 依照「日期 (YYYY-MM-DD) + 申請同仁」進行資料合併
+      const groupedMap = new Map();
+
+      rawData.forEach(r => {
+        const dateStr = r.date ? r.date.split(" ")[0] : "";
+        const key = `${dateStr}_${r.userName}`;
+
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, {
+            date: dateStr,
+            userName: r.userName,
+            items: [],
+            notes: []
+          });
+        }
+
+        const group = groupedMap.get(key);
+        // 將品項與數量格式化為 "品項名稱 x 數量"
+        group.items.push(`${r.itemName} × ${r.qty}`);
+        if (r.note && !group.notes.includes(r.note)) {
+          group.notes.push(r.note);
+        }
+      });
+
+      // 2. 渲染整合後的報表內容
+      groupedMap.forEach(group => {
+        const itemsHtml = group.items.join("<br>");
+        const notesText = group.notes.length > 0 ? group.notes.join("； ") : "-";
+
         tbody.innerHTML += `
           <tr>
-            <td class="text-center">${r.date.split(" ")[0]}</td>
-            <td class="text-center">${r.userName}</td>
-            <td>${r.itemName}</td>
-            <td class="text-center">${r.qty}</td>
-            <td>${r.note}</td>
-            <td class="text-center" style="height: 45px;"></td>
+            <td class="text-center">${group.date}</td>
+            <td class="text-center">${group.userName}</td>
+            <td style="text-align: left; line-height: 1.6;">${itemsHtml}</td>
+            <td>${notesText}</td>
+            <td class="text-center" style="height: 50px;"></td>
           </tr>`;
       });
 
