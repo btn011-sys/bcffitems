@@ -11,12 +11,6 @@
       #printableReportArea, #printableReportArea * { visibility: visible; }
       #printableReportArea { position: absolute; left: 0; top: 0; width: 100%; }
       .no-print { display: none !important; }
-
-      /* 印表時自動隱藏「備註用途」欄位 (第 4 欄) */
-      #reportTable th:nth-child(4),
-      #reportTable td:nth-child(4) {
-        display: none !important;
-      }
     }
   </style>
 </head>
@@ -133,11 +127,10 @@
           <table class="table table-bordered align-middle" id="reportTable">
             <thead class="table-light">
               <tr class="text-center">
-                <th style="width: 15%;">申請日期</th>
-                <th style="width: 15%;">申請同仁</th>
+                <th style="width: 20%;">申請日期</th>
+                <th style="width: 20%;">申請同仁</th>
                 <th style="width: 35%;">物資名稱與數量</th>
-                <th style="width: 15%;">備註用途</th>
-                <th style="width: 20%;">申請人簽名欄</th>
+                <th style="width: 25%;">申請人簽名欄</th>
               </tr>
             </thead>
             <tbody id="reportTableBody">
@@ -167,7 +160,7 @@
   
   let currentUser = null;
   let cart = [];
-  let allProducts = []; // 儲存所有物資以利前端搜尋
+  let allProducts = [];
 
   async function postToGAS(data) {
     const response = await fetch(GAS_URL, {
@@ -261,7 +254,6 @@
     });
   }
 
-  // 即時搜尋過濾功能
   function filterProducts() {
     const keyword = document.getElementById("searchInput").value.toLowerCase().trim();
     const filtered = allProducts.filter(p => 
@@ -347,7 +339,7 @@
     }
   }
 
-  // 產生含簽名欄與三級主管簽核區的報表（同日同一人整合邏輯）
+  // 產生每月申購報表（依「日期 + 申請人」分組，移除備註）
   async function generateReport() {
     const month = document.getElementById("reportMonth").value;
     if (!month) return alert("請選擇要匯出的月份");
@@ -362,10 +354,11 @@
       const tbody = document.getElementById("reportTableBody");
       tbody.innerHTML = "";
 
-      // 1. 使用 Map 依照「日期 (YYYY-MM-DD) + 申請同仁」進行資料合併
+      // 依「日期 (YYYY-MM-DD) + 申請同仁」作為唯一 Key 進行分組
       const groupedMap = new Map();
 
       rawData.forEach(r => {
+        // 擷取日期部分 (YYYY-MM-DD)
         const dateStr = r.date ? r.date.split(" ")[0] : "";
         const key = `${dateStr}_${r.userName}`;
 
@@ -373,30 +366,24 @@
           groupedMap.set(key, {
             date: dateStr,
             userName: r.userName,
-            items: [],
-            notes: []
+            items: []
           });
         }
 
         const group = groupedMap.get(key);
-        // 將品項與數量格式化為 "品項名稱 x 數量"
+        // 將同一天同一人的品項組合在一起
         group.items.push(`${r.itemName} × ${r.qty}`);
-        if (r.note && !group.notes.includes(r.note)) {
-          group.notes.push(r.note);
-        }
       });
 
-      // 2. 渲染整合後的報表內容
+      // 渲染結果（按日期順序呈現）
       groupedMap.forEach(group => {
         const itemsHtml = group.items.join("<br>");
-        const notesText = group.notes.length > 0 ? group.notes.join("； ") : "-";
 
         tbody.innerHTML += `
           <tr>
             <td class="text-center">${group.date}</td>
             <td class="text-center">${group.userName}</td>
             <td style="text-align: left; line-height: 1.6;">${itemsHtml}</td>
-            <td>${notesText}</td>
             <td class="text-center" style="height: 50px;"></td>
           </tr>`;
       });
