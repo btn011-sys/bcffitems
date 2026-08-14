@@ -127,9 +127,9 @@
           <table class="table table-bordered align-middle" id="reportTable">
             <thead class="table-light">
               <tr class="text-center">
-                <th style="width: 20%;">申請日期</th>
-                <th style="width: 20%;">申請同仁</th>
-                <th style="width: 35%;">物資名稱與數量</th>
+                <th style="width: 15%;">申請日期</th>
+                <th style="width: 15%;">申請同仁</th>
+                <th style="width: 45%;">物資名稱與數量</th>
                 <th style="width: 25%;">申請人簽名欄</th>
               </tr>
             </thead>
@@ -339,7 +339,7 @@
     }
   }
 
-  // 產生每月申購報表（依「日期 + 申請人」分組，移除備註）
+  // 產生每月申購報表（依「日期 + 申請人」分組，品項以頓號「、」接續呈現，無備註欄）
   async function generateReport() {
     const month = document.getElementById("reportMonth").value;
     if (!month) return alert("請選擇要匯出的月份");
@@ -354,11 +354,10 @@
       const tbody = document.getElementById("reportTableBody");
       tbody.innerHTML = "";
 
-      // 依「日期 (YYYY-MM-DD) + 申請同仁」作為唯一 Key 進行分組
+      // 依「日期 (YYYY-MM-DD) + 申請同仁」作為 Key 分組
       const groupedMap = new Map();
 
       rawData.forEach(r => {
-        // 擷取日期部分 (YYYY-MM-DD)
         const dateStr = r.date ? r.date.split(" ")[0] : "";
         const key = `${dateStr}_${r.userName}`;
 
@@ -371,20 +370,19 @@
         }
 
         const group = groupedMap.get(key);
-        // 將同一天同一人的品項組合在一起
         group.items.push(`${r.itemName} × ${r.qty}`);
       });
 
-      // 渲染結果（按日期順序呈現）
+      // 渲染結果：使用「、」將多個物資品項連接成一行文字[cite: 1]
       groupedMap.forEach(group => {
-        const itemsHtml = group.items.join("<br>");
+        const itemsText = group.items.join("、");
 
         tbody.innerHTML += `
           <tr>
             <td class="text-center">${group.date}</td>
             <td class="text-center">${group.userName}</td>
-            <td style="text-align: left; line-height: 1.6;">${itemsHtml}</td>
-            <td class="text-center" style="height: 50px;"></td>
+            <td style="text-align: left; line-height: 1.5;">${itemsText}</td>
+            <td class="text-center" style="height: 45px;"></td>
           </tr>`;
       });
 
